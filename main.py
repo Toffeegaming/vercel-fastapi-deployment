@@ -2,8 +2,10 @@ from time import time
 from fastapi import FastAPI, __version__
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
+from tinydb import TinyDB, Query
 from typing import Union, List, Tuple
 
+db = TinyDB('db.json')
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -50,3 +52,7 @@ html = f"""
 @app.get('/ping')
 async def hello():
     return {'res': 'pong', 'version': __version__, "time": time()}
+
+@app.get("/players")
+def read_players():
+    return db.all()
