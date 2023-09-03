@@ -1,3 +1,4 @@
+import uvicorn
 from time import time
 from os.path import join
 from fastapi import FastAPI, __version__
