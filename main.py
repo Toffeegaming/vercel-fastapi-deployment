@@ -7,7 +7,6 @@ from fastapi.responses import HTMLResponse
 from tinydb import TinyDB, Query
 from typing import Union, List, Tuple
 
-db = TinyDB("db.json")
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -57,6 +56,7 @@ async def hello():
 
 @app.get("/players")
 def read_players():
+    db = TinyDB("db.json")
     return db.all()
 
 if __name__ == "__main__":
