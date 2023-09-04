@@ -1,6 +1,6 @@
 import uvicorn, psycopg2, os
 from time import time
-from fastapi import FastAPI, __version__, HTTPException, Depends, Body, status
+from fastapi import FastAPI, __version__, HTTPException, Depends, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordBearer
