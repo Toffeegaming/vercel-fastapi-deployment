@@ -4,17 +4,27 @@ from fastapi import FastAPI, __version__, HTTPException, Depends, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordBearer
+from fastapi.middleware.cors import CORSMiddleware
 from trueskill import Rating, rate, MU, SIGMA
-from typing import Union, List, Tuple
-
+from typing import List, Tuple
+from pydantic import BaseModel
 
 CONN_STRING = os.getenv('DATABASE_URL')
+API_KEY = os.getenv('API_KEY')
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")  # use token authentication
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
-API_KEY = os.getenv('API_KEY')
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://padel.toffeegaming.dev",
+        "https://www.padel.toffeegaming.dev"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Classes
 class Player:
@@ -28,6 +38,13 @@ class Match:
         self.result = result
         self.players = players
         self.new_rankings = new_rankings
+
+class MatchReq(BaseModel):
+    playerId1: int
+    playerId2: int
+    playerId3: int
+    playerId4: int
+    result: int
 
 
 # Functions
@@ -194,37 +211,50 @@ def read_matches(match_id: int):
     return get_match(match_id)
 
 @app.post("/matches", dependencies=[Depends(api_key_auth)])
-def play_match(playerId1: Union[str, None] = None, playerId2: Union[str, None] = None, playerId3: Union[str, None] = None, playerId4: Union[str, None] = None, result: Union[int, None] = None):
-    if playerId1 is None or playerId2 is None or playerId3 is None or playerId4 is None or result is None:
-        raise HTTPException(status_code=404, detail="Not all inputs were specified")
+def play_match(req: MatchReq):
+    try:
+        playerId1 = req.playerId1
+        playerId2 = req.playerId2
+        playerId3 = req.playerId3
+        playerId4 = req.playerId4
+        result = req.result
 
-    if result not in [0, 1, 2]:
-        raise HTTPException(status_code=404, detail="Result must be 0, 1 or 2")
+        if playerId1 is None or playerId2 is None or playerId3 is None or playerId4 is None or result is None:
+            raise HTTPException(status_code=404, detail="Not all inputs were specified")
 
-    if result == 1:
-        rankings = [0, 1]
-    elif result == 2:
-        rankings = [1, 0]
-    else:
-        rankings = [0, 0]
+        if playerId1 == 0 or playerId2 == 0 or playerId3 == 0 or playerId4 == 0:
+                raise HTTPException(status_code=404, detail="Please use valid player IDs")
 
-    player1 = get_player_by_id(playerId1)
-    player2 = get_player_by_id(playerId2)
-    player3 = get_player_by_id(playerId3)
-    player4 = get_player_by_id(playerId4)
+        if result not in [0, 1, 2]:
+            raise HTTPException(status_code=404, detail="Result must be 0, 1 or 2")
 
-    playedMatch = Match(players=[player1, player2, player3, player4], result=rankings) # save ranking before match
-    
-    player1, player2, player3, player4 = get_new_ratings(player1, player2, player3, player4, rankings) # get new player ratings
-    playedMatch.new_rankings = [player1, player2, player3, player4] # save ranking after match
+        if result == 1:
+            rankings = [0, 1]
+        elif result == 2:
+            rankings = [1, 0]
+        else:
+            rankings = [0, 0]
 
-    # update player ratings in database
-    update_player_rating(player1)
-    update_player_rating(player2)
-    update_player_rating(player3)
-    update_player_rating(player4)
+        player1 = get_player_by_id(playerId1)
+        player2 = get_player_by_id(playerId2)
+        player3 = get_player_by_id(playerId3)
+        player4 = get_player_by_id(playerId4)
 
-    return add_match_to_db(playedMatch)
+        playedMatch = Match(players=[player1, player2, player3, player4], result=rankings) # save ranking before match
+        
+        player1, player2, player3, player4 = get_new_ratings(player1, player2, player3, player4, rankings) # get new player ratings
+        playedMatch.new_rankings = [player1, player2, player3, player4] # save ranking after match
+
+        # update player ratings in database
+        update_player_rating(player1)
+        update_player_rating(player2)
+        update_player_rating(player3)
+        update_player_rating(player4)
+
+        return add_match_to_db(playedMatch)
+
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

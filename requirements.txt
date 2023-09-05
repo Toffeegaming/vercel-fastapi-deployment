@@ -2,3 +2,4 @@ fastapi
 uvicorn
 trueskill
 psycopg2-binary
+pydantic
