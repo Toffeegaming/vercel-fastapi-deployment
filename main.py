@@ -134,6 +134,14 @@ def add_match_to_db(match: Match): # INSERT INTO matches (results, player_names,
     query =f"INSERT INTO matches (results, player_names, player_new_mu, player_new_sigma, player_old_mu, player_old_sigma) VALUES (ARRAY{match.result}, ARRAY['{match.players[0].name}', '{match.players[1].name}', '{match.players[2].name}', '{match.players[3].name}'], ARRAY[{match.new_rankings[0].mu}, {match.new_rankings[1].mu}, {match.new_rankings[2].mu}, {match.new_rankings[3].mu}],ARRAY[{match.new_rankings[0].sigma}, {match.new_rankings[1].sigma}, {match.new_rankings[2].sigma}, {match.new_rankings[3].sigma}],ARRAY[{match.players[0].mu}, {match.players[1].mu}, {match.players[2].mu}, {match.players[3].mu}],ARRAY[{match.players[0].sigma}, {match.players[1].sigma}, {match.players[2].sigma}, {match.players[3].sigma}]) RETURNING *;"
     return db_execute(query)
 
+def anydup(thelist):
+  seen = set()
+  for x in thelist:
+    if x in seen: return True
+    seen.add(x)
+  return False
+
+
 # API endpoints
 @app.get("/")
 async def root():
@@ -183,7 +191,7 @@ def add_player(player_name: str):
 def read_player_by_id(player_id: int):
     return get_player_by_id(player_id)
 
-@app.get("/matches/", dependencies=[Depends(api_key_auth)])
+@app.get("/matches", dependencies=[Depends(api_key_auth)])
 def read_matches():
     matches = db_execute('SELECT * FROM matches;')
     result = {}
@@ -206,7 +214,7 @@ def read_matches():
         result = result | matchDict
     return result
 
-@app.get("/matches/{match_id}}", dependencies=[Depends(api_key_auth)])
+@app.get("/matches/{match_id}", dependencies=[Depends(api_key_auth)])
 def read_matches(match_id: int):
     return get_match(match_id)
 
@@ -218,6 +226,9 @@ def play_match(req: MatchReq):
         playerId3 = req.playerId3
         playerId4 = req.playerId4
         result = req.result
+
+        if anydup([playerId1, playerId2, playerId3, playerId4]):
+            raise HTTPException(status_code=404, detail="Please use unique player IDs")
 
         if playerId1 is None or playerId2 is None or playerId3 is None or playerId4 is None or result is None:
             raise HTTPException(status_code=404, detail="Not all inputs were specified")
