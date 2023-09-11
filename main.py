@@ -1,4 +1,5 @@
-import uvicorn, psycopg2, os
+import uvicorn, psycopg2
+from os import getenv
 from time import time
 from fastapi import FastAPI, __version__, HTTPException, Depends, status
 from fastapi.staticfiles import StaticFiles
@@ -8,9 +9,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from trueskill import Rating, rate, MU, SIGMA
 from typing import List, Tuple
 from pydantic import BaseModel
+from webhook import PostWebhook
 
-CONN_STRING = os.getenv('DATABASE_URL')
-API_KEY = os.getenv('API_KEY')
+CONN_STRING = getenv('DATABASE_URL')
+API_KEY = getenv('API_KEY')
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")  # use token authentication
 app = FastAPI()
@@ -219,7 +221,7 @@ def read_matches(match_id: int):
     return get_match(match_id)
 
 @app.post("/matches", dependencies=[Depends(api_key_auth)])
-def play_match(req: MatchReq):
+async def play_match(req: MatchReq):
     try:
         playerId1 = req.playerId1
         playerId2 = req.playerId2
@@ -262,7 +264,9 @@ def play_match(req: MatchReq):
         update_player_rating(player3)
         update_player_rating(player4)
 
-        return add_match_to_db(playedMatch)
+        result =add_match_to_db(playedMatch)
+        await PostWebhook(result)
+        return result
 
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
