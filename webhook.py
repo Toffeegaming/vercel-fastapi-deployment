@@ -9,9 +9,9 @@ async def PostWebhook(input):
         player3 = input['players']['3']['name']
         player4 = input['players']['4']['name']
         result = input['result']
-        if result == [0,1]:
+        if result == 1:
             webhookContent = f"{player1} en {player2} hebben gewonnen tegen {player3} en {player4}"
-        elif result == [1,0]:
+        elif result == 2:
             webhookContent = f"{player3} en {player4} hebben gewonnen tegen {player1} en {player2}"
         else:
             webhookContent = f"{player1} en {player2} hebben gelijk gespeeld tegen {player3} en {player4}"
