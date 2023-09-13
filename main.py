@@ -1,4 +1,4 @@
-import uvicorn, psycopg2, asyncio
+import uvicorn, psycopg2
 from os import getenv
 from time import time
 from fastapi import FastAPI, __version__, HTTPException, Depends, status
@@ -108,10 +108,6 @@ def get_player_by_id(player_id: int) -> Player:
     result = db_execute('SELECT * FROM players WHERE id = ' + str(player_id) + ';')
     return Player(result[0][1], float(result[0][2]), float(result[0][3]))
 
-async def async_get_player_by_id(player_id: int) -> Player:
-    result = db_execute('SELECT * FROM players WHERE id = ' + str(player_id) + ';')
-    return Player(result[0][1], float(result[0][2]), float(result[0][3]))
-
 def get_match(match_id: int) -> Match:
     result = db_execute('SELECT * FROM matches WHERE id = ' + str(match_id) + ';')[0]
     return Match(
@@ -130,10 +126,6 @@ def get_match(match_id: int) -> Match:
 
 
 def update_player_rating(target: Player):
-    result = db_execute('UPDATE players SET mu = ' + str(target.mu) + ', sigma = ' + str(target.sigma) + ' WHERE UPPER(name) = UPPER(\'' + target.name + '\') RETURNING *;')
-    return Player(result[0][1], result[0][2], result[0][3])
-
-async def async_update_player_rating(target: Player):
     result = db_execute('UPDATE players SET mu = ' + str(target.mu) + ', sigma = ' + str(target.sigma) + ' WHERE UPPER(name) = UPPER(\'' + target.name + '\') RETURNING *;')
     return Player(result[0][1], result[0][2], result[0][3])
 
@@ -244,27 +236,10 @@ async def play_match(req: MatchReq):
             raise HTTPException(status_code=404, detail="Not all inputs were specified")
 
         if playerId1 == 0 or playerId2 == 0 or playerId3 == 0 or playerId4 == 0:
-            raise HTTPException(status_code=404, detail="Please use valid player IDs")
+                raise HTTPException(status_code=404, detail="Please use valid player IDs")
 
         if result not in [0, 1, 2]:
             raise HTTPException(status_code=404, detail="Result must be 0, 1 or 2")
-
-        await HandleMatch(req)
-
-        return {'response': 'success'}
-
-    except Exception as e:
-        print(e)
-        raise HTTPException(status_code=404, detail=str(e))
-    
-async def HandleMatch(req: MatchReq):
-    print('Handling match')
-    try:
-        playerId1 = req.playerId1
-        playerId2 = req.playerId2
-        playerId3 = req.playerId3
-        playerId4 = req.playerId4
-        result = req.result
 
         if result == 1:
             rankings = [0, 1]
@@ -273,22 +248,27 @@ async def HandleMatch(req: MatchReq):
         else:
             rankings = [0, 0]
 
-        playerData = asyncio.gather(async_get_player_by_id(playerId1), async_get_player_by_id(playerId2), async_get_player_by_id(playerId3), async_get_player_by_id(playerId4))
-        player1, player2, player3, player4 = await playerData
+        player1 = get_player_by_id(playerId1)
+        player2 = get_player_by_id(playerId2)
+        player3 = get_player_by_id(playerId3)
+        player4 = get_player_by_id(playerId4)
+
         playedMatch = Match(players=[player1, player2, player3, player4], result=rankings) # save ranking before match
         
         player1, player2, player3, player4 = get_new_ratings(player1, player2, player3, player4, rankings) # get new player ratings
         playedMatch.new_rankings = [player1, player2, player3, player4] # save ranking after match
 
-        newPlayerData = asyncio.gather(async_update_player_rating(player1), async_update_player_rating(player2), async_update_player_rating(player3), async_update_player_rating(player4))
-        await newPlayerData
-        print('Updated player ratings')
+        # update player ratings in database
+        update_player_rating(player1)
+        update_player_rating(player2)
+        update_player_rating(player3)
+        update_player_rating(player4)
 
-        result = add_match_to_db(playedMatch)
+        result =add_match_to_db(playedMatch)
         await PostWebhook(result)
+        return result
 
     except Exception as e:
-        print(e)
         raise HTTPException(status_code=404, detail=str(e))
 
 if __name__ == "__main__":

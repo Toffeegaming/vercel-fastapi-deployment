@@ -4,4 +4,3 @@ trueskill
 psycopg2-binary
 pydantic
 discord-webhook[async]
-asyncio
